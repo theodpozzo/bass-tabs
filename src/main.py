@@ -26,8 +26,6 @@ def process_song(input_path: str, output_dir: str) -> None:
 
     # --- STEP 1: Audio Separation ---
     print("[1/4] Isolating bass track with Demucs...")
-    # You'll need to decide where separate_bass saves its temporary audio files.
-    # For now, let's assume it puts them in a 'data/stems' folder and returns the path.
     stems_dir = Path("data/stems")
     stems_dir.mkdir(parents=True, exist_ok=True)
 
