@@ -82,7 +82,7 @@ def extract_notes(audio_path: str) -> list[dict]:
     audio, sr = librosa.load(audio_path, sr=16000, mono=True)
 
     # Hop length determines time resolution of pitch frames
-    hop_length = 256
+    hop_length = 256  # ~16ms per frame at 16 kHz, good for bass note changes
 
     # -----------------------------------------------------------------
     # Pitch detection using the YIN algorithm
