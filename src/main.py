@@ -29,19 +29,17 @@ def process_song(input_path: str, output_dir: str) -> None:
     stems_dir = Path("data/stems")
     stems_dir.mkdir(parents=True, exist_ok=True)
 
-    # bass_stem_path = separate_bass(str(input_file), str(stems_dir))
+    bass_stem_path = separate_bass(str(input_file), str(stems_dir))
 
     # --- STEP 2: Pitch Detection ---
-    print("[2/4] Analyzing pitch using Torchcrepe...")
-    # raw_notes = extract_notes(bass_stem_path)
-    raw_notes = extract_notes(
-        "data/stems/mdx_extra/Come Together (intro)/bass.mp3")
+    print("[2/4] Analyzing pitch using Swift_f0...")
+    raw_notes = extract_notes(bass_stem_path)
 
     if not raw_notes:
         print("❌ No notes detected! Exiting.")
         return
 
-    print(raw_notes)
+    # print(raw_notes)
 
     # --- STEP 3: Fretboard Logic ---
     print("[3/4] Mapping notes to bass fretboard...")

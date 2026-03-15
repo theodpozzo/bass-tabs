@@ -1,149 +1,161 @@
 """
 Module for converting musical notes into bass guitar tablature.
-Applies fretboard logic and formats the output into readable text.
+Applies fretboard optimization logic and formats the output into readable ASCII text 
+with rhythmic spacing.
 """
-
 import librosa
 
-
-# ------------------------------------------------------------------
-# Standard bass tuning (MIDI note numbers)
-# ------------------------------------------------------------------
-
-BASS_STRINGS = {
-    "E": librosa.note_to_midi("E1"),
-    "A": librosa.note_to_midi("A1"),
-    "D": librosa.note_to_midi("D2"),
-    "G": librosa.note_to_midi("G2"),
+# Standard EADG Bass Tuning in MIDI values
+# The bottom line represents the E string.
+# The top line represents the G string.
+TUNING_MIDI = {
+    'G': 43,
+    'D': 38,
+    'A': 33,
+    'E': 28
 }
 
-MAX_FRET = 20
+MAX_FRET = 22
 
-
-# ------------------------------------------------------------------
-# Determine playable fretboard positions
-# ------------------------------------------------------------------
 
 def map_notes_to_frets(notes: list[dict]) -> list[dict]:
     """
-    Converts detected notes into playable bass string/fret positions.
-
-    Strategy
-    --------
-    For each note:
-    1. Convert note name → MIDI pitch
-    2. Check each bass string to see if the note is reachable
-    3. Choose the position with the lowest fret number
-
-    Parameters
-    ----------
-    notes : list[dict]
-
-        Example input element:
-        {
-            "note": "F2",
-            "start_time": 1.2,
-            "duration": 0.4
-        }
-
-    Returns
-    -------
-    list[dict]
-
-        Example output element:
-        {
-            "note": "F2",
-            "start_time": 1.2,
-            "duration": 0.4,
-            "string": "E",
-            "fret": 1
-        }
+    Takes a sequence of notes and determines the optimal string and fret 
+    for each, minimizing hand movement across the fretboard.
     """
-
     fretted_notes = []
+    prev_fret = 3
 
-    for n in notes:
+    for note_data in notes:
+        target_midi = librosa.note_to_midi(note_data['note'])
+        possible_positions = []
 
-        note_name = n["note"]
-        midi_note = librosa.note_to_midi(note_name)
+        for string_name, string_midi in TUNING_MIDI.items():
+            fret_needed = target_midi - string_midi
+            if 0 <= fret_needed <= MAX_FRET:
+                possible_positions.append({
+                    'string': string_name,
+                    'fret': fret_needed
+                })
 
-        candidates = []
+        best_position = None
+        lowest_cost = float('inf')
 
-        # Check each string to see if the note can be played
-        for string, open_midi in BASS_STRINGS.items():
+        if not possible_positions:
+            best_position = {'string': 'E', 'fret': int(target_midi - 28)}
+        else:
+            for pos in possible_positions:
+                if pos['fret'] == 0:
+                    cost = 0
+                else:
+                    cost = abs(pos['fret'] - prev_fret)
 
-            fret = midi_note - open_midi
+                if cost > 8:
+                    cost += 50
 
-            if 0 <= fret <= MAX_FRET:
-                candidates.append((string, fret))
+                if cost < lowest_cost:
+                    lowest_cost = cost
+                    best_position = pos
 
-        # Skip if note is outside bass range
-        if not candidates:
-            continue
+        note_data['string'] = best_position['string']
+        note_data['fret'] = best_position['fret']
+        fretted_notes.append(note_data)
 
-        # Choose the lowest fret position
-        string, fret = min(candidates, key=lambda x: x[1])
-
-        fretted_note = {
-            **n,
-            "string": string,
-            "fret": fret
-        }
-
-        fretted_notes.append(fretted_note)
+        if best_position['fret'] != 0:
+            prev_fret = best_position['fret']
 
     return fretted_notes
 
 
-# ------------------------------------------------------------------
-# Convert fretted notes into ASCII bass tab
-# ------------------------------------------------------------------
-
 def generate_tab_text(fretted_notes: list[dict]) -> str:
     """
-    Converts fretted notes into a simple ASCII bass tab.
-
-    Notes are placed sequentially across the tab.
-    Timing is approximate — each note occupies a fixed slot.
-
-    Parameters
-    ----------
-    fretted_notes : list[dict]
-
-    Returns
-    -------
-    str
-        Multiline string representing the bass tab.
+    Formats a sequence of fretted notes into a standard text-based bass tab.
+    Implements rhythmic spacing based on note duration and start times.
     """
+    if not fretted_notes:
+        return "No notes detected to tab!"
 
-    # Create empty tab lines
-    tab = {
-        "G": [],
-        "D": [],
-        "A": [],
-        "E": []
-    }
+    final_tab_string = "🎸 BASS TAB GENERATED BY AI PIPELINE 🎸\n"
+    final_tab_string += "\n"  # Blank line after header
 
-    for note in fretted_notes:
+    # We define our "grid resolution".
+    # 0.1 seconds equals one dash '-' in the tab.
+    # This allows the player to visually read the rhythm.
+    TIME_PER_DASH = 0.1
 
-        string = note["string"]
-        fret = str(note["fret"])
+    # A standard measure (bar) in 4/4 time at 120bpm is 2.0 seconds long.
+    # We will draw a vertical bar line '|' every 2.0 seconds.
+    BAR_LENGTH_SECONDS = 2.0
 
-        # Width ensures alignment for double-digit frets
-        width = max(2, len(fret))
+    # We will chunk the output so it doesn't scroll infinitely right.
+    # Let's put 4 bars per line block.
+    BLOCK_LENGTH_SECONDS = BAR_LENGTH_SECONDS * 4
 
-        for s in tab:
+    # Find the total length of the song based on the last note
+    last_note = fretted_notes[-1]
+    total_duration = last_note['start_time'] + last_note['duration']
 
-            if s == string:
-                tab[s].append(fret.ljust(width, "-"))
-            else:
-                tab[s].append("-" * width)
+    current_time = 0.0
+    note_index = 0
 
-    # Join each string into a line
-    lines = []
+    # Loop through the song, chunking it into blocks of 8 seconds
+    while current_time < total_duration:
 
-    for s in ["G", "D", "A", "E"]:
-        line = s + "|" + "".join(tab[s])
-        lines.append(line)
+        block_end_time = current_time + BLOCK_LENGTH_SECONDS
 
-    return "\n".join(lines)
+        # Initialize empty strings for this block
+        lines = {
+            'G': "G |",
+            'D': "D |",
+            'A': "A |",
+            'E': "E |"
+        }
+
+        # Walk through this specific 8-second block in 0.1s steps
+        step_time = current_time
+        while step_time < block_end_time:
+
+            # Are we at a measure boundary? Draw a bar line!
+            # Bars help you figure out the structure and rhythm of a song.
+            if round(step_time % BAR_LENGTH_SECONDS, 2) == 0.0 and step_time != current_time:
+                for s in lines:
+                    lines[s] += "|"
+
+            # Check if our current note should be played at this exact step_time
+            if note_index < len(fretted_notes):
+                current_note = fretted_notes[note_index]
+
+                # If the note starts exactly now (or we just passed its start time)
+                if current_note['start_time'] <= step_time < (current_note['start_time'] + TIME_PER_DASH):
+                    played_string = current_note['string']
+                    fret = str(current_note['fret'])
+
+                    # Format the fret number to take up consistent space
+                    fret_str = fret if len(fret) == 2 else f"{fret}-"
+
+                    for s in lines.keys():
+                        if s == played_string:
+                            lines[s] += fret_str
+                        else:
+                            lines[s] += "--"
+
+                    # Move to the next note, but only step time forward by 0.1s
+                    note_index += 1
+                    step_time += TIME_PER_DASH * 2  # Skip extra space since we printed 2 chars
+                    continue
+
+            # If no note is starting right now, just print an empty dash for rhythm spacing
+            for s in lines.keys():
+                lines[s] += "-"
+            step_time += TIME_PER_DASH
+
+        # Add the completed block to the final text document
+        final_tab_string += lines['G'] + "\n"
+        final_tab_string += lines['D'] + "\n"
+        final_tab_string += lines['A'] + "\n"
+        final_tab_string += lines['E'] + "\n"
+        final_tab_string += "\n"  # Blank line between blocks
+
+        current_time = block_end_time
+
+    return final_tab_string
