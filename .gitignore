@@ -205,3 +205,13 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# 1. Ignore EVERYTHING inside these specific data directories
+data/inputs/*
+data/outputs/*
+data/stems/mdx_extra/*
+
+# 2. EXCEPT for "Feel Good Inc (intro)" (Force Git to track these)
+!data/inputs/Feel Good Inc (intro).mp3
+!data/outputs/Feel Good Inc (intro)_bass_tab.txt
+!data/stems/mdx_extra/Feel Good Inc (intro)/

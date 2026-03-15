@@ -32,12 +32,14 @@ def process_song(input_path: str, output_dir: str) -> None:
     bass_stem_path = separate_bass(str(input_file), str(stems_dir))
 
     # --- STEP 2: Pitch Detection ---
-    print("[2/4] Analyzing pitch using Torchcrepe...")
+    print("[2/4] Analyzing pitch using Swift_f0...")
     raw_notes = extract_notes(bass_stem_path)
 
     if not raw_notes:
         print("❌ No notes detected! Exiting.")
         return
+
+    # print(raw_notes)
 
     # --- STEP 3: Fretboard Logic ---
     print("[3/4] Mapping notes to bass fretboard...")
