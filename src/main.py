@@ -34,7 +34,8 @@ def process_song(input_path: str, output_dir: str) -> None:
     # --- STEP 2: Pitch Detection ---
     print("[2/4] Analyzing pitch using Torchcrepe...")
     # raw_notes = extract_notes(bass_stem_path)
-    raw_notes = extract_notes("data/stems/mdx_extra/Come Together/bass.mp3")
+    raw_notes = extract_notes(
+        "data/stems/mdx_extra/Come Together (intro)/bass.mp3")
 
     if not raw_notes:
         print("❌ No notes detected! Exiting.")
