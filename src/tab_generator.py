@@ -15,16 +15,25 @@ TUNING_MIDI = {
     'E': 28
 }
 
-MAX_FRET = 22
+# Most bass guitars have around 20-24 frets, but mine has 20, so we'll use that as a hard limit.
+MAX_FRET = 20
 
 
 def map_notes_to_frets(notes: list[dict]) -> list[dict]:
     """
-    Takes a sequence of notes and determines the optimal string and fret 
-    for each, minimizing hand movement across the fretboard.
+    Generalized fretboard mapping algorithm.
+    Uses a dynamic greedy approach to minimize hand movement and string skipping 
+    across the fretboard without any hardcoded anchor points.
     """
     fretted_notes = []
-    prev_fret = 3
+
+    # We don't know where the hand starts. We initialize to None.
+    # The first note will establish our starting position organically.
+    current_fret = None
+
+    # Map strings to an index to calculate vertical string-skipping costs
+    string_indices = {'G': 0, 'D': 1, 'A': 2, 'E': 3}
+    current_string_idx = None
 
     for note_data in notes:
         target_midi = librosa.note_to_midi(note_data['note'])
@@ -35,127 +44,179 @@ def map_notes_to_frets(notes: list[dict]) -> list[dict]:
             if 0 <= fret_needed <= MAX_FRET:
                 possible_positions.append({
                     'string': string_name,
-                    'fret': fret_needed
+                    'fret': fret_needed,
+                    'string_idx': string_indices[string_name]
                 })
 
+        # Fallback for sub-bass notes below the E string (Drop tuning)
+        if not possible_positions:
+            fallback = {'string': 'E', 'fret': int(
+                target_midi - 28), 'string_idx': 3}
+            note_data['string'] = fallback['string']
+            note_data['fret'] = fallback['fret']
+            fretted_notes.append(note_data)
+            continue
+
+        # --- DYNAMIC INITIALIZATION ---
+        # If this is the very first note, pick the most "standard" starting position
+        # We prefer fretted notes over open strings to establish a solid hand shape.
+        if current_fret is None:
+            best_start = min(possible_positions,
+                             key=lambda p: p['fret'] if p['fret'] > 0 else 99)
+            if best_start['fret'] == 99:  # Failsafe if ONLY open strings were available
+                best_start = min(possible_positions, key=lambda p: p['fret'])
+
+            current_fret = best_start['fret']
+            current_string_idx = best_start['string_idx']
+
+        # --- THE COST FUNCTION ---
         best_position = None
         lowest_cost = float('inf')
 
-        if not possible_positions:
-            best_position = {'string': 'E', 'fret': int(target_midi - 28)}
-        else:
-            for pos in possible_positions:
-                if pos['fret'] == 0:
-                    cost = 0
+        for pos in possible_positions:
+            fret = pos['fret']
+            str_idx = pos['string_idx']
+            cost = 0
+
+            # 1. Horizontal Hand Movement
+            # Bassists comfortably pivot within a 3-fret span.
+            distance = abs(fret - current_fret)
+            if distance > 2 and fret != 0:
+                # Exponential penalty for big slides
+                cost += (distance - 2) * 5
+
+            # 2. Vertical String Skipping
+            # Crossing from E to G string is harder than E to A.
+            if current_string_idx is not None:
+                str_distance = abs(str_idx - current_string_idx)
+                cost += str_distance * 1.5
+
+            # 3. Contextual Open Strings
+            # Open strings are great if playing low on the neck (frets 1-4).
+            # They are terrible if the hand is all the way up at the 12th fret.
+            if fret == 0:
+                if current_fret > 5:
+                    cost += 10  # Heavy penalty: Don't jump from fret 12 to open string
                 else:
-                    cost = abs(pos['fret'] - prev_fret)
+                    cost += 1  # Slight penalty to keep tone consistent within boxes
 
-                if cost > 8:
-                    cost += 50
+            # 4. High Fret Penalty (Tone logic)
+            # Bassists generally prefer thicker strings at lower frets over thin strings high up.
+            if fret > 10:
+                cost += (fret - 10) * 0.5
 
-                if cost < lowest_cost:
-                    lowest_cost = cost
-                    best_position = pos
+            if cost < lowest_cost:
+                lowest_cost = cost
+                best_position = pos
 
+        # --- SAVE THE OPTIMIZED POSITION ---
         note_data['string'] = best_position['string']
         note_data['fret'] = best_position['fret']
         fretted_notes.append(note_data)
 
+        # Update the hand's center of gravity dynamically
+        # (We ignore open strings because they don't force the hand to move)
         if best_position['fret'] != 0:
-            prev_fret = best_position['fret']
+            current_fret = best_position['fret']
+        current_string_idx = best_position['string_idx']
 
     return fretted_notes
 
 
-def generate_tab_text(fretted_notes: list[dict]) -> str:
+def generate_tab_text(fretted_notes: list[dict], song_name: str) -> str:
     """
-    Formats a sequence of fretted notes into a standard text-based bass tab.
-    Implements rhythmic spacing based on note duration and start times.
+    Generate perfectly aligned ASCII bass tablature.
+
+    Features
+    --------
+    • Fixed-width time grid
+    • Multi-digit fret support
+    • 4 bars per line
+    • Perfect alignment across strings
+    • Bar separators
     """
+
     if not fretted_notes:
-        return "No notes detected to tab!"
+        return "No notes detected."
 
-    final_tab_string = "🎸 BASS TAB GENERATED BY AI PIPELINE 🎸\n"
-    final_tab_string += "\n"  # Blank line after header
+    header = (
+        "Bass tabs generated by Theo's AI Bass Tab Generator\n"
+        f"Song Name: {song_name}\n\n"
+    )
 
-    # We define our "grid resolution".
-    # 0.1 seconds equals one dash '-' in the tab.
-    # This allows the player to visually read the rhythm.
-    TIME_PER_DASH = 0.1
+    # -------------------------
+    # Timing parameters
+    # -------------------------
 
-    # A standard measure (bar) in 4/4 time at 120bpm is 2.0 seconds long.
-    # We will draw a vertical bar line '|' every 2.0 seconds.
-    BAR_LENGTH_SECONDS = 2.0
+    TIME_PER_STEP = 0.05        # resolution of grid (seconds)
+    BAR_LENGTH = 0.5            # 4/4 bar at 120 bpm
+    BARS_PER_LINE = 4
 
-    # We will chunk the output so it doesn't scroll infinitely right.
-    # Let's put 4 bars per line block.
-    BLOCK_LENGTH_SECONDS = BAR_LENGTH_SECONDS * 4
+    STEPS_PER_BAR = int(BAR_LENGTH / TIME_PER_STEP)
+    STEPS_PER_LINE = STEPS_PER_BAR * BARS_PER_LINE
 
-    # Find the total length of the song based on the last note
-    last_note = fretted_notes[-1]
-    total_duration = last_note['start_time'] + last_note['duration']
+    # Determine song duration
+    last = fretted_notes[-1]
+    total_duration = last["start_time"] + last["duration"]
 
-    current_time = 0.0
-    note_index = 0
+    total_steps = int(total_duration / TIME_PER_STEP) + 1
 
-    # Loop through the song, chunking it into blocks of 8 seconds
-    while current_time < total_duration:
+    # -------------------------
+    # Build empty grid
+    # -------------------------
 
-        block_end_time = current_time + BLOCK_LENGTH_SECONDS
+    grid = {
+        "G": ["--"] * total_steps,
+        "D": ["--"] * total_steps,
+        "A": ["--"] * total_steps,
+        "E": ["--"] * total_steps,
+    }
 
-        # Initialize empty strings for this block
-        lines = {
-            'G': "G |",
-            'D': "D |",
-            'A': "A |",
-            'E': "E |"
-        }
+    # -------------------------
+    # Place notes into grid
+    # -------------------------
 
-        # Walk through this specific 8-second block in 0.1s steps
-        step_time = current_time
-        while step_time < block_end_time:
+    for note in fretted_notes:
 
-            # Are we at a measure boundary? Draw a bar line!
-            # Bars help you figure out the structure and rhythm of a song.
-            if round(step_time % BAR_LENGTH_SECONDS, 2) == 0.0 and step_time != current_time:
-                for s in lines:
-                    lines[s] += "|"
+        step = int(note["start_time"] / TIME_PER_STEP)
 
-            # Check if our current note should be played at this exact step_time
-            if note_index < len(fretted_notes):
-                current_note = fretted_notes[note_index]
+        string = note["string"]
+        fret = str(note["fret"])
 
-                # If the note starts exactly now (or we just passed its start time)
-                if current_note['start_time'] <= step_time < (current_note['start_time'] + TIME_PER_DASH):
-                    played_string = current_note['string']
-                    fret = str(current_note['fret'])
+        # Normalize width (always 2 chars)
+        fret_cell = fret.rjust(2, "-")
 
-                    # Format the fret number to take up consistent space
-                    fret_str = fret if len(fret) == 2 else f"{fret}-"
+        if step < total_steps:
+            grid[string][step] = fret_cell
 
-                    for s in lines.keys():
-                        if s == played_string:
-                            lines[s] += fret_str
-                        else:
-                            lines[s] += "--"
+    # -------------------------
+    # Render lines
+    # -------------------------
 
-                    # Move to the next note, but only step time forward by 0.1s
-                    note_index += 1
-                    step_time += TIME_PER_DASH * 2  # Skip extra space since we printed 2 chars
-                    continue
+    output = header
 
-            # If no note is starting right now, just print an empty dash for rhythm spacing
-            for s in lines.keys():
-                lines[s] += "-"
-            step_time += TIME_PER_DASH
+    num_lines = (total_steps // STEPS_PER_LINE) + 1
 
-        # Add the completed block to the final text document
-        final_tab_string += lines['G'] + "\n"
-        final_tab_string += lines['D'] + "\n"
-        final_tab_string += lines['A'] + "\n"
-        final_tab_string += lines['E'] + "\n"
-        final_tab_string += "\n"  # Blank line between blocks
+    for line_index in range(num_lines):
 
-        current_time = block_end_time
+        start = line_index * STEPS_PER_LINE
+        end = start + STEPS_PER_LINE
 
-    return final_tab_string
+        for string in ["G", "D", "A", "E"]:
+
+            line = f"{string}|"
+
+            for step in range(start, min(end, total_steps)):
+
+                # Insert bar separators
+                if step != start and (step - start) % STEPS_PER_BAR == 0:
+                    line += "|"
+
+                line += grid[string][step]
+
+            line += "|"
+            output += line + "\n"
+
+        output += "\n"
+
+    return output
