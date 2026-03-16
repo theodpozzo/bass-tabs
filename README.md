@@ -111,12 +111,12 @@ Bass strings generate massive overtones (e.g., the 2nd harmonic is often louder 
 
 If you need to tune the duration filters or visualize the pitch tracking, `src/pitch_detector.py` includes an optional Matplotlib function (`plot_pitch_data`) to graph the raw Hz, the median-smoothed Hz, the quantized MIDI stair-steps, and the SwiftF0 gating confidence.
 
-🔮 Future Roadmap: True Machine Learning Tablature Inference
+### 🔮 Future Roadmap: True Machine Learning Tablature Inference
 
 While the current Dynamic Greedy Cost Function effectively calculates physical fretboard distances, the next major evolution for this project is to replace the heuristic physics engine with a fully supervised Deep Learning model (such as a Transformer) to handle tablature generation.
 
-    The Training Data: I plan to build a custom dataset mapping thousands of human-transcribed bass tabs to their corresponding raw MIDI sequences (using [MIDI] as the input X and [String, Fret] combinations as the target Y).
+1. **The Training Data:** I plan to build a custom dataset mapping thousands of human-transcribed bass tabs to their corresponding raw MIDI sequences (using [MIDI] as the input X and [String, Fret] combinations as the target Y).
 
-    Context-Aware AI: Instead of relying on hardcoded math to find the shortest distance, a sequence-modeling neural network will learn the actual "grammar" and stylistic nuances of human bass players. By analyzing the contextual sequence of notes around a target pitch, the model will organically understand when to stay in a tight box shape, and when a bassist would naturally choose to slide up a thicker string for a warmer tone.
+2. **Context-Aware AI:** Instead of relying on hardcoded math to find the shortest distance, a sequence-modeling neural network will learn the actual "grammar" and stylistic nuances of human bass players. By analyzing the contextual sequence of notes around a target pitch, the model will organically understand when to stay in a tight box shape, and when a bassist would naturally choose to slide up a thicker string for a warmer tone.
 
-    The End Goal: A seamless, end-to-end AI pipeline where raw audio is converted to MIDI via SwiftF0, and a trained Machine Learning model instantly predicts the most natural, human-feeling tablature based on real-world ergonomic data.
+3. **The End Goal:** A seamless, end-to-end AI pipeline where raw audio is converted to MIDI via SwiftF0, and a trained Machine Learning model instantly predicts the most natural, human-feeling tablature based on real-world ergonomic data.
