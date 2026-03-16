@@ -34,6 +34,6 @@ def separate_bass(input_path: str, output_dir: str) -> str:
     # Structure: output_dir / model_name / track_name / "bass.mp3"
     track_name = Path(input_path).stem
     expected_out_path = Path(output_dir) / "mdx_extra" / \
-        track_name / "__bass.mp3"
+        track_name / "bass.mp3"
 
     return str(expected_out_path)
