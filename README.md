@@ -1,93 +1,113 @@
-# 🎸 Bass Tab Generator
+<markdown>
 
-An automated pipeline that takes a mixed audio track (like an MP3 or WAV), isolates the bass guitar, analyzes the pitches, and generates a text-based bass tablature. 
+# 🎸 AI Bass Tab Generator
 
-Born out of the frustration of not being able to find a proper bass tab for *Strangers To Neighbours* by The Vanns, this project combines Machine Learning (Music Information Retrieval) with algorithmic fretboard logic to transcribe basslines automatically.
+An automated machine learning pipeline that transcribes raw audio files into highly accurate, rhythmically spaced, and ergonomically mapped bass guitar tablature.
+
+Built to solve the "Missing Tab" problem for niche songs, this tool isolates the bass track from any audio file, extracts the fundamental pitches using state-of-the-art neural networks, and uses a dynamic cost-function algorithm to map the notes to the most natural physical fretboard positions.
 
 ## ✨ Features
-* **Source Separation:** Uses Facebook's `demucs` to isolate the bass track from a fully mixed audio file.
-* **Accurate Pitch Detection:** Leverages `torchcrepe` (a PyTorch-based neural network) to analyze the isolated bass stem and extract precise musical notes.
-* **Algorithmic Fretboard Mapping:** Translates a sequence of musical pitches into logical string and fret combinations for standard EADG bass tuning.
-* **CLI Interface:** Easy-to-use command-line interface for batch processing songs.
 
-## 🛠️ Tech Stack
-* **Language:** Python 3.12
-* **Audio Processing:** `librosa`, `soundfile`, FFmpeg
-* **Machine Learning:** PyTorch, `demucs`, `torchcrepe`
-* **Data Handling:** `numpy`, `scipy`
+* **Audio Source Separation:** Uses Meta's `demucs` to cleanly isolate the bass stem from full-band mixes (handling drum bleed and competing frequencies).
+* **State-of-the-Art Pitch Detection:** Upgraded to **SwiftF0**, a lightweight (95k parameter) ONNX model that is ~42x faster than CREPE and highly resistant to the heavy overtone hallucinations common in bass guitar frequencies.
+* **Ergonomic Fretboard Mapping:** Replaces naive string-jumping with a **Dynamic Greedy Cost Function**. The algorithm evaluates horizontal hand movement, vertical string-skipping, and contextual open-string penalties to generate tight, playable "box shapes."
+* **Rhythmic Formatting:** Unlike naive tab generators, the text output includes a rigid chronological grid (where 1 dash `-` = 0.1 seconds) and automatic measure lines, allowing the player to actually read the rhythm of the performance.
+* **Batch Processing:** Seamlessly process a single `.mp3` or an entire directory of tracks with one command.
 
-## 📂 Project Structure
+## 🧠 Pipeline Architecture
+
 ```text
-bass-tabs/
-├── data/
-│   ├── inputs/          # Place your raw MP3/WAV files here
-│   ├── stems/           # Isolated bass stems are saved here
-│   └── outputs/         # Generated text tabs are saved here
-├── src/
-│   ├── audio_processor.py   # Handles demucs source separation
-│   ├── pitch_detector.py    # Handles torchcrepe pitch extraction
-│   ├── tab_generator.py     # Handles string/fret logic & formatting
-│   └── main.py              # The CLI orchestrator
-├── requirements.txt         # Python dependencies
-├── .gitignore               
-└── README.md                
+Audio File (mp3/wav)
+    │
+    ▼
+1. Source Separation (Demucs) ──▶ Isolates raw bass stem
+    │
+    ▼
+2. Pitch Detection (SwiftF0) ──▶ Neural network extracts raw Hz and confidence scores
+    │
+    ▼
+3. Signal Processing ──▶ Amplitude gating, median filtering, and transient noise suppression
+    │
+    ▼
+4. MIDI Quantization ──▶ Snaps micro-tonal vibrato to the 12-tone musical grid
+    │
+    ▼
+5. Fretboard Optimization ──▶ Cost-function maps notes to optimal E-A-D-G string combinations
+    │
+    ▼
+Text Output (.txt) ──▶ Rhythmically spaced ASCII Tablature
 
 ```
 
-## 🚀 Getting Started
+## ⚙️ Installation
 
-### 1. System Requirements
-
-This project relies on `demucs` and `librosa`, which require **FFmpeg** to handle audio files under the hood.
-
-* **Linux (Ubuntu/Mint):** `sudo apt update && sudo apt install ffmpeg`
-* **Mac:** `brew install ffmpeg`
-* **Windows:** Download from the [FFmpeg website](https://ffmpeg.org/download.html) and add it to your system PATH.
-
-### 2. Python Setup
-
-Clone the repository and set up a virtual environment:
-
+1. **Clone the repository:**
 ```bash
-git clone [https://github.com/yourusername/bass-tabs.git](https://github.com/yourusername/bass-tabs.git)
+git clone https://github.com/yourusername/bass-tabs.git
 cd bass-tabs
 
-# Create and activate virtual environment
-python3 -m venv .venv
-source .venv/bin/activate  # On Windows use: .venv\Scripts\activate
+```
 
-# Install dependencies
-pip install --upgrade pip
+
+2. **Set up a virtual environment (Recommended):**
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+
+```
+
+
+3. **Install dependencies:**
+```bash
 pip install -r requirements.txt
 
 ```
 
-*(Note: If you have an NVIDIA GPU, PyTorch and Demucs will automatically leverage it for significantly faster processing times!)*
 
-## 🎧 Usage
+*Required packages include: `librosa`, `numpy`, `scipy`, `matplotlib`, `demucs`, and `swiftf0`.*
 
-To generate a bass tab, run the orchestrator script and pass the path to your audio file:
+## 🚀 Usage
+
+The Command Line Interface (CLI) is dynamically routed. You can pass it a single audio file or a folder containing multiple tracks.
+
+**Transcribe a single song:**
 
 ```bash
-python src/main.py data/inputs/strangers_to_neighbours.mp3
+python src/main.py "data/inputs/Strangers To Neighbours.mp3"
 
 ```
 
-By default, the text tab will be saved to `data/outputs/`. You can specify a custom output directory using the `--output` flag:
+**Batch process an entire directory:**
 
 ```bash
-python src/main.py data/inputs/song.wav --output custom/path/
+python src/main.py data/inputs/ --output data/outputs/
 
 ```
 
-## 🗺️ Roadmap & Future Expansions
-[x]
-* [ ] Audio source separation pipeline
-* [ ] Deep learning pitch detection
-* [ ] Basic EADG fretboard mapping
-* [ ] Add support for 5-string and Drop D tunings
-* [ ] **Generative ML:** Train a model on the output tabs to generate completely original, cool basslines based on inputted chord progressions.
+### Example Output
 
-## 📄 License
+The generated tab (`SongName_bass_tab.txt`) will look like this, featuring accurate box shapes and proportional rhythm spacing:
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+```text
+🎸 BASS TAB GENERATED BY AI PIPELINE 🎸
+
+G |--------------------|--------------------|-------------------------------9------10-|
+D |--------------------|--------------------|--------9------10------12----------------|
+A |--------------------|-----8------10------|12---------------------------------------|
+E |---8------10------12|--------------------|-----------------------------------------|
+
+```
+
+## 🛠️ Advanced Details
+
+### The "Octave Error" Solution
+
+Bass strings generate massive overtones (e.g., the 2nd harmonic is often louder than the fundamental root). This pipeline tackles this via:
+
+1. **SwiftF0:** Known for an Octave Accuracy (OA) of 96.75% on clean audio.
+2. **Algorithmic Gravity:** A heavy cost penalty in `tab_generator.py` suppresses sudden, unnatural 12-fret jumps, effectively clamping down on any residual overtone hallucinations.
+
+### Visualization & Debugging
+
+If you need to tune the duration filters or visualize the pitch tracking, `src/pitch_detector.py` includes an optional Matplotlib function (`plot_pitch_data`) to graph the raw Hz, the median-smoothed Hz, the quantized MIDI stair-steps, and the SwiftF0 gating confidence.
+</markdown>
