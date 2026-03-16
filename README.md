@@ -1,5 +1,3 @@
-<markdown>
-
 # 🎸 AI Bass Tab Generator
 
 An automated machine learning pipeline that transcribes raw audio files into highly accurate, rhythmically spaced, and ergonomically mapped bass guitar tablature.
@@ -42,27 +40,27 @@ Text Output (.txt) ──▶ Rhythmically spaced ASCII Tablature
 ## ⚙️ Installation
 
 1. **Clone the repository:**
+
 ```bash
 git clone https://github.com/theodpozzo/bass-tabs.git
 cd bass-tabs
 
 ```
 
-
 2. **Set up a virtual environment (Recommended):**
+
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
 
 ```
 
-
 3. **Install dependencies:**
+
 ```bash
 pip install -r requirements.txt
 
 ```
-
 
 *Required packages include: `librosa`, `numpy`, `scipy`, `matplotlib`, `demucs`, and `swiftf0`.*
 
