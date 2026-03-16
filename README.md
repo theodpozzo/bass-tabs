@@ -43,7 +43,7 @@ Text Output (.txt) ──▶ Rhythmically spaced ASCII Tablature
 
 1. **Clone the repository:**
 ```bash
-git clone https://github.com/yourusername/bass-tabs.git
+git clone https://github.com/theodpozzo/bass-tabs.git
 cd bass-tabs
 
 ```
